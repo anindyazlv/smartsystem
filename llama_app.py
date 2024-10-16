@@ -4,7 +4,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
 import torch
 from llama_index.core.prompts.prompts import SimpleInputPrompt
 from llama_index.llms.huggingface import HuggingFaceLLM
-from llama_index.embeddings.langchain import LangchainEmbeddin
+from llama_index.embeddings.langchain import LangchainEmbedding
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 from llama_index import set_global_service_context
 from llama_index import ServiceContext
