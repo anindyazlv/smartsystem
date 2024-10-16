@@ -6,7 +6,6 @@ from llama_index.core.prompts.prompts import SimpleInputPrompt
 from llama_index.llms.huggingface import HuggingFaceLLM
 from llama_index.embeddings.langchain import LangchainEmbedding
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index import set_global_service_context
 from pathlib import Path
 from llama_index.core.llms.llm import LLM
 from llama_index.core import Settings
