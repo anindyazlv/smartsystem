@@ -1,24 +1,16 @@
-# Import streamlit for app dev
-import streamlit as st
 
-# Import transformer classes for generation
+import streamlit as st
 from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
-# Import torch for datatype attributes
 import torch
-# Import the prompt wrapper...but for llama index
 from llama_index.core.prompts.prompts import SimpleInputPrompt
-# Import the llama index HF Wrapper
 from llama_index.llms.huggingface import HuggingFaceLLM
-# Bring in embeddings wrapper
 from llama_index.embeddings.langchain import LangchainEmbeddin
-# Bring in HF embeddings - need these to represent document chunks
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
-# Bring in stuff to change service context
 from llama_index import set_global_service_context
 from llama_index import ServiceContext
-# Import deps to load documents
 from llama_index import VectorStoreIndex, download_loader
 from pathlib import Path
+from llama_index.core.llms.llm import LLM
 
 # Define variable to hold llama2 weights naming
 name = "meta-llama/Llama-2-7b-chat-hf"
