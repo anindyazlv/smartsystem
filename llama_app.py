@@ -1,6 +1,6 @@
 # Import streamlit for app dev
 import streamlit as st
-import llama_index
+
 # Import pandas for data manipulation
 import pandas as pd
 # Import transformer classes for generation
@@ -8,24 +8,22 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
 # Import torch for datatype attributes
 import torch
 # Import the prompt wrapper...but for llama index
-from llama_index.prompts.prompts import SimpleInputPrompt
+from llama_index.core.prompts.prompts import SimpleInputPrompt
 # Import the llama index HF Wrapper
-from llama_index.llms import HuggingFaceLLM
+from llama_index.llms.huggingface import HuggingFaceLLM
 # Bring in embeddings wrapper
-from llama_index.embeddings import LangchainEmbedding
+from llama_index.embeddings.langchain import LangchainEmbedding
 # Bring in HF embeddings - need these to represent document chunks
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 # Bring in stuff to change service context
-from llama_index import set_global_service_context
-from llama_index import ServiceContext
-# Import deps to load documents
-from llama_index import VectorStoreIndex, download_loader
+from llama_index.core import Settings, set_global_service_context, VectorStoreIndex, download_loader
+# Import deps to load documents 
 from pathlib import Path
 
 # Define variable to hold llama2 weights naming
 name = "meta-llama/Llama-2-7b-chat-hf"
 # Set auth token variable from hugging face
-auth_token = '<YOUR_HUGGINGFACE_TOKEN>'
+auth_token = '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'
 
 @st.cache_resource
 def get_tokenizer_model():
@@ -71,7 +69,11 @@ embeddings=LangchainEmbedding(
 )
 
 # Create new service context instance
-service_context = ServiceContext.from_defaults(
+Settings.chunk_size=1024
+Settings.llm=llm,
+Settings.embed_model=embeddings
+
+service_context = Settings(
     chunk_size=1024,
     llm=llm,
     embed_model=embeddings
