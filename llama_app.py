@@ -1,4 +1,3 @@
-
 import streamlit as st
 from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
 import torch
@@ -56,7 +55,7 @@ llm = HuggingFaceLLM(context_window=4096,
 
 # Create and dl embeddings instance
 embeddings=LangchainEmbedding(
-    HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    HuggingFaceEmbedding(model_name="all-MiniLM-L6-v2")
 )
 
 Settings.chunk_size = 1024
