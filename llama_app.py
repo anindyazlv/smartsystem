@@ -1,128 +1,129 @@
+# Import streamlit for app dev
 import streamlit as st
+import llama_index
+# Import pandas for data manipulation
+import pandas as pd
+# Import transformer classes for generation
+from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
+# Import torch for datatype attributes
 import torch
-from transformers import BitsAndBytesConfig
-
-# llama_index
-from llama_index.core import VectorStoreIndex,SimpleDirectoryReader,PromptTemplate
-from llama_index.llms.huggingface import HuggingFaceLLM
+# Import the prompt wrapper...but for llama index
+from llama_index.prompts.prompts import SimpleInputPrompt
+# Import the llama index HF Wrapper
+from llama_index.llms import HuggingFaceLLM
+# Bring in embeddings wrapper
+from llama_index.embeddings import LangchainEmbedding
+# Bring in HF embeddings - need these to represent document chunks
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
-from llama_index.embeddings.langchain import LangchainEmbedding
-from llama_index.core import Settings
-from llama_index.core import StorageContext, load_index_from_storage
+# Bring in stuff to change service context
+from llama_index import set_global_service_context
+from llama_index import ServiceContext
+# Import deps to load documents
+from llama_index import VectorStoreIndex, download_loader
+from pathlib import Path
 
+# Define variable to hold llama2 weights naming
+name = "meta-llama/Llama-2-7b-chat-hf"
+# Set auth token variable from hugging face
+auth_token = '<YOUR_HUGGINGFACE_TOKEN>'
 
+@st.cache_resource
+def get_tokenizer_model():
+    # Create tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(name, cache_dir='./model/', token=auth_token)
 
+    # Create model
+    model = AutoModelForCausalLM.from_pretrained(name, cache_dir='./model/'
+                            , token=auth_token, torch_dtype=torch.float16,
+                            rope_scaling={"type": "dynamic", "factor": 2}, load_in_8bit=True)
 
-######################### Data Connectors #########################
-def load_text_and_get_chunks(path_to_pdfs):
-    documents = SimpleDirectoryReader(path_to_pdfs).load_data()
-    
-    return documents
+    return tokenizer, model
+tokenizer, model = get_tokenizer_model()
 
-######################### Models #########################
-def load_llm():
-    hf_token = "#####"
+# Create a system prompt
+system_prompt = """<s>[INST] <<SYS>>
+You are a helpful, respectful and honest assistant. Always answer as
+helpfully as possible, while being safe. Your answers should not include
+any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content.
+Please ensure that your responses are socially unbiased and positive in nature.
 
-    SYSTEM_PROMPT = """You are an AI assistant that answers questions in a friendly manner, based on the given source documents. Here are some rules you always follow:
-- Generate human readable output, avoid creating output with gibberish text.
-- Generate only the requested output, don't include any other language before or after the requested output.
-- Never say thank you, that you are happy to help, that you are an AI agent, etc. Just answer directly.
-- Generate professional language.
-- Never generate offensive or foul language.
-- Do not write "The authors" in any answer
-- Do not use "[]" in any answer
-- Write every answer like a list of known facts without referring to anybody or any document in the third person
-- Never use references in square brackets or otherwise in the output, but provide material examples if possible.
+If a question does not make any sense, or is not factually coherent, explain
+why instead of answering something not correct. If you don't know the answer
+to a question, please don't share false information.
+
+Your goal is to provide answers relating to the financial performance of
+the company.<</SYS>>
 """
+# Throw together the query wrapper
+query_wrapper_prompt = SimpleInputPrompt("{query_str} [/INST]")
 
-    query_wrapper_prompt = PromptTemplate(
-        "[INST]<<SYS>>\n" + SYSTEM_PROMPT + "<</SYS>>\n\n{query_str}[/INST] "
-    )
+# Create a HF LLM using the llama index wrapper
+llm = HuggingFaceLLM(context_window=4096,
+                    max_new_tokens=256,
+                    system_prompt=system_prompt,
+                    query_wrapper_prompt=query_wrapper_prompt,
+                    model=model,
+                    tokenizer=tokenizer)
 
-    # load the model with quantized features
-    quantization_config = BitsAndBytesConfig(
-    load_in_8bit=True,
-    bnb_8bit_compute_dtype=torch.float16,
-    bnb_8bit_quant_type="nf8",
-    bnb_8bit_use_double_quant=True,
-    )
+# Create and dl embeddings instance
+embeddings=LangchainEmbedding(
+    HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+)
 
-    llm = HuggingFaceLLM(
-    context_window=4096,
-    max_new_tokens=1024,
-    generate_kwargs={"temperature": 0.1, "do_sample": True},
-    system_prompt=SYSTEM_PROMPT,
-    query_wrapper_prompt=query_wrapper_prompt,
-    tokenizer_name="meta-llama/Llama-2-7b-chat-hf",
-    model_name="meta-llama/Llama-2-7b-chat-hf",
-    device_map="cuda:1",
-    # uncomment this if using CUDA to reduce memory usage
-    model_kwargs={"token": hf_token, "quantization_config": quantization_config}
-    )
-    return llm
+# Create new service context instance
+service_context = ServiceContext.from_defaults(
+    chunk_size=1024,
+    llm=llm,
+    embed_model=embeddings
+)
+# And set the service context
+set_global_service_context(service_context)
 
-def load_embeddings():
-        
-    embed_model=LangchainEmbedding(
-    HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2"))
-    
-    return embed_model
+# Add file upload functionality
+uploaded_file = st.file_uploader("Upload a PDF file", type=["pdf"])
 
-st.set_page_config(page_title="AMGPT", page_icon="🦙", layout="centered", initial_sidebar_state="auto", menu_items=None)
-st.title("AMGPT, powered by LlamaIndex 💬🦙")
-#st.info("AMGPT ", icon="📃")
+# Load documents if a file is uploaded
+if uploaded_file:
+    # Save the uploaded file to a temporary location
+    with open("temp.pdf", "wb") as temp_file:
+        temp_file.write(uploaded_file.read())
 
-# Remove the loading message
-placeholder = st.empty()
-placeholder.empty()
-         
-if "messages" not in st.session_state.keys(): # Initialize the chat messages history
-    st.session_state.messages = [
-        {"role": "assistant", "content": "Ask me a question!!!"}
-    ]
+    # Download PDF Loader
+    PyMuPDFReader = download_loader("PyMuPDFReader")
+    # Create PDF Loader
+    loader = PyMuPDFReader()
+    # Load documents
+    documents = loader.load(file_path=Path("temp.pdf"))
 
+    # New code to convert PosixPath objects to strings
+    for document in documents:
+        if 'file_path' in document.metadata:
+            document.metadata['file_path'] = str(document.metadata['file_path'])
 
+    # Create an index - we'll be able to query this in a sec
+    index = VectorStoreIndex.from_documents(documents)
+    # Setup index query engine using LLM
+    query_engine = index.as_query_engine()
 
-# Create a placeholder for the loading message
-placeholder = st.empty()
-placeholder.text("Loading the LLM, please wait...")
+    # Remove the temporary file
+    Path("temp.pdf").unlink()
 
-# get llm
-llm = load_llm()
+    # Create centered main title
+    st.title('🦙 Llama 2 - RAG')
+    # Create a text input box for the user
+    prompt = st.text_input('Input your prompt here')
 
+    # If the user hits enter
+    if prompt:
+        response = query_engine.query(prompt)
+        # ...and write it out to the screen
+        # Extract and print the response text
+        response_text = response.response
+        st.write(response_text)
 
-
-# get embeddings
-embed_model = load_embeddings()
-
-Settings.llm = llm
-Settings.embed_model = embed_model
-
-# create vector store and index
-storage_context = StorageContext.from_defaults(persist_dir="######")
-vector_index = load_index_from_storage(storage_context)
-
-# Remove the loading message
-placeholder.empty()
-
-if "chat_engine" not in st.session_state.keys(): # Initialize the chat engine
-    st.session_state.chat_engine = vector_index.as_chat_engine(chat_mode="condense_plus_context", verbose=True)
-
-if prompt := st.chat_input("Your question"): # Prompt for user input and save to chat history
-    st.session_state.messages.append({"role": "user", "content": prompt})
-
-
-for message in st.session_state.messages: # Display the prior chat messages
-    with st.chat_message(message["role"]):
-        st.write(message["content"])
-
-# If last message is not from assistant, generate a new response
-if st.session_state.messages[-1]["role"] != "assistant":
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            response = st.session_state.chat_engine.chat(prompt)
-            st.write(response.response)
-            message = {"role": "assistant", "content": response.response}
-            st.session_state.messages.append(message) # Add response to message history
-
-                
+        # Display raw response object
+        with st.expander('Response Object'):
+            st.write(response)
+        # Display source text
+        with st.expander('Source Text'):
+            st.write(response.get_formatted_sources())
