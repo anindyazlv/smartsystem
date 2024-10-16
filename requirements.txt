@@ -7,5 +7,6 @@ bitsandbytes
 sentence_transformers
 llama-index
 llama-index-llms-huggingface
+llama-index-llms-ollama
 llama-index-embeddings-langchain
 streamlit
