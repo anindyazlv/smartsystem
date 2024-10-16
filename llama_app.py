@@ -60,14 +60,9 @@ embeddings=LangchainEmbedding(
     HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 )
 
-# Create new service context instance
-service_context = ServiceContext.from_defaults(
-    chunk_size=1024,
-    llm=llm,
-    embed_model=embeddings
-)
-# And set the service context
-set_global_service_context(service_context)
+Settings.chunk_size = 1024
+Settings.llm=llm
+Settings.embed_model=embeddings
 
 # Add file upload functionality
 uploaded_file = st.file_uploader("Upload a PDF file", type=["pdf"])
