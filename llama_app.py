@@ -1,23 +1,23 @@
-# Import streamlit for app dev
+# Import streamlit for app development
 import streamlit as st
 
 # Import pandas for data manipulation
 import pandas as pd
 # Import transformer classes for generation
-from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
+from transformers import AutoTokenizer, AutoModelForCausalLM
 # Import torch for datatype attributes
 import torch
-# Import the prompt wrapper...but for llama index
+# Import the prompt wrapper for llama index
 from llama_index.core.prompts.prompts import SimpleInputPrompt
 # Import the llama index HF Wrapper
 from llama_index.llms.huggingface import HuggingFaceLLM
 # Bring in embeddings wrapper
 from llama_index.embeddings.langchain import LangchainEmbedding
-# Bring in HF embeddings - need these to represent document chunks
+# Bring in HF embeddings
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
-# Bring in stuff to change service context
+# Change service context settings
 from llama_index.core import Settings, set_global_service_context, VectorStoreIndex, download_loader
-# Import deps to load documents 
+# Import dependencies to load documents
 from pathlib import Path
 
 # Define variable to hold llama2 weights naming
@@ -31,11 +31,16 @@ def get_tokenizer_model():
     tokenizer = AutoTokenizer.from_pretrained(name, cache_dir='./model/', token=auth_token)
 
     # Create model
-    model = AutoModelForCausalLM.from_pretrained(name, cache_dir='./model/'
-                            , token=auth_token, torch_dtype=torch.float16,
-                            rope_scaling={"type": "dynamic", "factor": 2}, load_in_8bit=True)
+    model = AutoModelForCausalLM.from_pretrained(
+        name, 
+        cache_dir='./model/',
+        token=auth_token, 
+        torch_dtype=torch.float16,
+        load_in_8bit=True
+    )
 
     return tokenizer, model
+
 tokenizer, model = get_tokenizer_model()
 
 # Create a system prompt
@@ -52,33 +57,33 @@ to a question, please don't share false information.
 Your goal is to provide answers relating to the financial performance of
 the company.<</SYS>>
 """
-# Throw together the query wrapper
+
+# Query wrapper prompt
 query_wrapper_prompt = SimpleInputPrompt("{query_str} [/INST]")
 
 # Create a HF LLM using the llama index wrapper
-llm = HuggingFaceLLM(context_window=4096,
-                    max_new_tokens=256,
-                    system_prompt=system_prompt,
-                    query_wrapper_prompt=query_wrapper_prompt,
-                    model=model,
-                    tokenizer=tokenizer)
+llm = HuggingFaceLLM(
+    context_window=4096,
+    max_new_tokens=256,
+    system_prompt=system_prompt,
+    query_wrapper_prompt=query_wrapper_prompt,
+    model=model,
+    tokenizer=tokenizer
+)
 
-# Create and dl embeddings instance
-embeddings=LangchainEmbedding(
+# Create and download embeddings instance
+embeddings = LangchainEmbedding(
     HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 )
 
 # Create new service context instance
-Settings.chunk_size=1024
-Settings.llm=llm,
-Settings.embed_model=embeddings
-
 service_context = Settings(
     chunk_size=1024,
     llm=llm,
     embed_model=embeddings
 )
-# And set the service context
+
+# Set the service context
 set_global_service_context(service_context)
 
 # Add file upload functionality
@@ -97,12 +102,11 @@ if uploaded_file:
     # Load documents
     documents = loader.load(file_path=Path("temp.pdf"))
 
-    # New code to convert PosixPath objects to strings
+    # Convert PosixPath objects to strings in metadata
     for document in documents:
-        if 'file_path' in document.metadata:
-            document.metadata['file_path'] = str(document.metadata['file_path'])
+        document.metadata['file_path'] = str(document.metadata.get('file_path', ''))
 
-    # Create an index - we'll be able to query this in a sec
+    # Create an index from documents
     index = VectorStoreIndex.from_documents(documents)
     # Setup index query engine using LLM
     query_engine = index.as_query_engine()
@@ -118,8 +122,7 @@ if uploaded_file:
     # If the user hits enter
     if prompt:
         response = query_engine.query(prompt)
-        # ...and write it out to the screen
-        # Extract and print the response text
+        # Extract and display the response text
         response_text = response.response
         st.write(response_text)
 
