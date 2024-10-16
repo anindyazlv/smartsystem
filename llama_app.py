@@ -1,29 +1,29 @@
-# Import streamlit for app development
+# Import streamlit for app dev
 import streamlit as st
 
-# Import pandas for data manipulation
-import pandas as pd
 # Import transformer classes for generation
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
 # Import torch for datatype attributes
 import torch
-# Import the prompt wrapper for llama index
-from llama_index.core.prompts.prompts import SimpleInputPrompt
+# Import the prompt wrapper...but for llama index
+from llama_index.prompts.prompts import SimpleInputPrompt
 # Import the llama index HF Wrapper
-from llama_index.llms.huggingface import HuggingFaceLLM
+from llama_index.llms import HuggingFaceLLM
 # Bring in embeddings wrapper
-from llama_index.embeddings.langchain import LangchainEmbedding
-# Bring in HF embeddings
+from llama_index.embeddings import LangchainEmbedding
+# Bring in HF embeddings - need these to represent document chunks
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
-# Change service context settings
-from llama_index.core import Settings, set_global_service_context, VectorStoreIndex, download_loader
-# Import dependencies to load documents
+# Bring in stuff to change service context
+from llama_index import set_global_service_context
+from llama_index import ServiceContext
+# Import deps to load documents
+from llama_index import VectorStoreIndex, download_loader
 from pathlib import Path
 
 # Define variable to hold llama2 weights naming
 name = "meta-llama/Llama-2-7b-chat-hf"
 # Set auth token variable from hugging face
-auth_token = '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'
+auth_token = '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'
 
 @st.cache_resource
 def get_tokenizer_model():
@@ -31,16 +31,11 @@ def get_tokenizer_model():
     tokenizer = AutoTokenizer.from_pretrained(name, cache_dir='./model/', token=auth_token)
 
     # Create model
-    model = AutoModelForCausalLM.from_pretrained(
-        name, 
-        cache_dir='./model/',
-        token=auth_token, 
-        torch_dtype=torch.float16,
-        load_in_8bit=True
-    )
+    model = AutoModelForCausalLM.from_pretrained(name, cache_dir='./model/'
+                            , token=auth_token, torch_dtype=torch.float16,
+                            rope_scaling={"type": "dynamic", "factor": 2}, load_in_8bit=True)
 
     return tokenizer, model
-
 tokenizer, model = get_tokenizer_model()
 
 # Create a system prompt
@@ -57,33 +52,29 @@ to a question, please don't share false information.
 Your goal is to provide answers relating to the financial performance of
 the company.<</SYS>>
 """
-
-# Query wrapper prompt
+# Throw together the query wrapper
 query_wrapper_prompt = SimpleInputPrompt("{query_str} [/INST]")
 
 # Create a HF LLM using the llama index wrapper
-llm = HuggingFaceLLM(
-    context_window=4096,
-    max_new_tokens=256,
-    system_prompt=system_prompt,
-    query_wrapper_prompt=query_wrapper_prompt,
-    model=model,
-    tokenizer=tokenizer
-)
+llm = HuggingFaceLLM(context_window=4096,
+                    max_new_tokens=256,
+                    system_prompt=system_prompt,
+                    query_wrapper_prompt=query_wrapper_prompt,
+                    model=model,
+                    tokenizer=tokenizer)
 
-# Create and download embeddings instance
-embeddings = LangchainEmbedding(
+# Create and dl embeddings instance
+embeddings=LangchainEmbedding(
     HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 )
 
 # Create new service context instance
-service_context = Settings(
+service_context = ServiceContext.from_defaults(
     chunk_size=1024,
     llm=llm,
     embed_model=embeddings
 )
-
-# Set the service context
+# And set the service context
 set_global_service_context(service_context)
 
 # Add file upload functionality
@@ -102,11 +93,12 @@ if uploaded_file:
     # Load documents
     documents = loader.load(file_path=Path("temp.pdf"))
 
-    # Convert PosixPath objects to strings in metadata
+    # New code to convert PosixPath objects to strings
     for document in documents:
-        document.metadata['file_path'] = str(document.metadata.get('file_path', ''))
+        if 'file_path' in document.metadata:
+            document.metadata['file_path'] = str(document.metadata['file_path'])
 
-    # Create an index from documents
+    # Create an index - we'll be able to query this in a sec
     index = VectorStoreIndex.from_documents(documents)
     # Setup index query engine using LLM
     query_engine = index.as_query_engine()
@@ -122,7 +114,8 @@ if uploaded_file:
     # If the user hits enter
     if prompt:
         response = query_engine.query(prompt)
-        # Extract and display the response text
+        # ...and write it out to the screen
+        # Extract and print the response text
         response_text = response.response
         st.write(response_text)
 
