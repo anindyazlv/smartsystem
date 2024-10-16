@@ -18,4 +18,4 @@ xformers
 sentencepiece
 scipy
 pydantic
-python==3.10
+python==3.10.12
