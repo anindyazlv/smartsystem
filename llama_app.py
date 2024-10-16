@@ -5,12 +5,12 @@ import torch
 from llama_index.core.prompts.prompts import SimpleInputPrompt
 from llama_index.llms.huggingface import HuggingFaceLLM
 from llama_index.embeddings.langchain import LangchainEmbedding
-from langchain.embeddings.huggingface import HuggingFaceEmbeddings
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index import set_global_service_context
-from llama_index import ServiceContext
-from llama_index import VectorStoreIndex, download_loader
 from pathlib import Path
 from llama_index.core.llms.llm import LLM
+from llama_index.core import Settings
+from llama_index.core import VectorStoreIndex, ServiceContext, SimpleDirectoryReader, download_loader
 
 # Define variable to hold llama2 weights naming
 name = "meta-llama/Llama-2-7b-chat-hf"
