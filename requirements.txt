@@ -16,3 +16,5 @@ torchaudio
 langchain-community 
 xformers 
 sentencepiece
+scipy
+pydantic
