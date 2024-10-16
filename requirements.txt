@@ -1,4 +1,4 @@
-pypdf
+ipython
 transformers
 einops
 accelerate
