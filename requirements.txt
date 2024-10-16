@@ -6,6 +6,13 @@ langchain
 bitsandbytes
 sentence_transformers
 llama-index
+llama-hub
 llama-index-llms-huggingface
 llama-index-embeddings-langchain
 streamlit
+torch
+torchvision
+torchaudio
+langchain-community 
+xformers 
+sentencepiece
